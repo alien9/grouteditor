@@ -26,7 +26,15 @@ export class JSONEditorComponent implements OnInit {
     {id:'selectlist', name:'selectlist'},
     {id:'reference', name:'reference'},
   ]
-
+  formats=[
+    {id: "text", name: "Single line text"},
+    {id: "textarea", name: "Paragraph text"},
+    {id: "number", name: "Number"},
+    {id: "color", name: "HTML Color"},
+    {id: "tel", name: "Telephone number"},
+    {id: "datetime", name: "Date / Time"},
+    {id: "url", name: "Website URL"}
+  ]
 
   constructor(private elementRef:ElementRef) {
         this.textarea = this.elementRef.nativeElement.getAttribute('textarea_id');
@@ -38,10 +46,10 @@ export class JSONEditorComponent implements OnInit {
       try{
         this.set(JSON.parse((<HTMLInputElement>window.document.getElementById(this.textarea)).value));
       }catch(e){
-        this.set({"schema":{"properties":{}}});
+        this.set({"properties":{}});
       }
     }else{
-      this.set({"schema":{"properties":{}}});
+      this.set({"properties":{}});
     }
   }
   load(event):void{
@@ -54,10 +62,9 @@ export class JSONEditorComponent implements OnInit {
   set(v): void{
     this.dict=v;
     this.value=JSON.stringify(this.dict);
-    this.referables=Object.keys(this.dict.schema.properties).filter(key => this.dict.schema.definitions[key].multiple).map(k => ({"key":k, "value":this.dict.schema.definitions[k]}));
+    this.referables=Object.keys(this.dict.properties).filter(key => this.dict.definitions[key].multiple).map(k => ({"key":k, "value":this.dict.definitions[k]}));
   }
   onclick(): void{
-    alert(this.teste);
     this.value=JSON.stringify(this.dict);
   }
   compareByOptionId(idFist, idSecond): boolean{
@@ -90,35 +97,36 @@ export class JSONEditorComponent implements OnInit {
         h[k]=o.properties[k];
       }
     }
+    if(o.required && (o.required.indexOf(oldkey)>=0)){
+      o.required.splice(o.required.indexOf(oldkey),1);
+      o.required.push(event.srcElement.value);
+    }
     o.properties=h;
   }
   newTable(tablename): void{
     let propertyOrder: number=0;
-    for(var j in this.dict.schema.properties){
+    for(var j in this.dict.properties){
       if(j==tablename){
         var version=0;
-        while(this.dict.schema.properties[tablename]){
+        while(this.dict.properties[tablename]){
           version++;
           tablename=(tablename+"0").replace(/\d+$/,""+version);
         }
       }
-      if(this.dict.schema.properties[j].propertyOrder >= propertyOrder){
-        propertyOrder=1+this.dict.schema.properties[j].propertyOrder;
+      if(this.dict.properties[j].propertyOrder >= propertyOrder){
+        propertyOrder=1+this.dict.properties[j].propertyOrder;
       }
     }
 
     var properties={};
     var definitions={};
-    for(var k in this.dict.schema.properties){
-        properties[k]=this.dict.schema.properties[k];
-        definitions[k]=this.dict.schema.definitions[k];
+    for(var k in this.dict.properties){
+        properties[k]=this.dict.properties[k];
+        definitions[k]=this.dict.definitions[k];
     }
     properties[tablename]={
-            "type": "array",
-            "items": {"$ref": "#/definitions/"+tablename},
-            "title": "Insert title",
+            "$ref": "#/definitions/"+tablename,
             "options": {"collapsed": true},
-            "plural_title":"Plural title",
             "propertyOrder": propertyOrder
     };
     definitions[tablename]={
@@ -134,11 +142,21 @@ export class JSONEditorComponent implements OnInit {
             "plural_title": "Plural title",
             "propertyOrder": propertyOrder
           };
-    this.dict.schema.definitions=definitions;
-    this.dict.schema.properties=properties;
+    this.dict.definitions=definitions;
+    this.dict.properties=properties;
     this.set(this.dict);
   }
-  setMode(s): void{
+  setMode(s, e): void{
+    if(s=='tree'){
+      if(e){
+        var a=e.srcElement.parentNode.parentNode.getElementsByTagName('textarea')[0].value;
+        try{
+          this.set(JSON.parse(a));
+        }catch(e){
+
+        }
+      }
+    }
     this.mode=s;
   }
   renameModel(model, event):void {
@@ -149,44 +167,66 @@ export class JSONEditorComponent implements OnInit {
     title = 'driver' + title[0].toUpperCase() + title.slice(1);
     let h={};
     let hc={};
-    for(var k in this.dict.schema.properties){
+    for(var k in this.dict.properties){
       if(k==title){
         var version=0;
-        while(this.dict.schema.properties[title]){
+        while(this.dict.properties[title]){
           version++;
           title=(title+"0").replace(/\d+$/,""+version);
         }
       }
     }
-    for(var k in this.dict.schema.properties){
+    for(var k in this.dict.properties){
       if(k==model){
-        h[title]=this.dict.schema.properties[k];
-        hc[title]=this.dict.schema.definitions[k];
+        h[title]=this.dict.properties[k];
+        hc[title]=this.dict.definitions[k];
       }else{
-        h[k]=this.dict.schema.properties[k];
-        hc[k]=this.dict.schema.definitions[k];
+        h[k]=this.dict.properties[k];
+        hc[k]=this.dict.definitions[k];
       }
     }
     h[title]["items"]={
           "$ref": "#/definitions/"+title
         };
     h[title]["title"]=event.srcElement.value;
-    this.dict.schema.properties=h;
-    this.dict.schema.definitions=hc;
+    this.dict.properties=h;
+    this.dict.definitions=hc;
     let res={"properties":h,"definitions":hc};
-    this.set({"schema":res});
+    this.set(res);
   }
   newOption(f): void{
-    f.enum.push("New Option");
+    if(f.enum)
+      f.enum.push("New Option");
+    if(f.items && f.items.enum)
+      f.items.enum.push("New Option");
   }
   removeOption(f, o): void{
-     f.enum.splice(o,1);
+    if(f.enum)
+      f.enum.splice(o,1);
+    if(f.items && f.items.enum)
+      f.items.enum.splice(o,1);
   }
   setPropertyValue(a, i, event): void{
     a[i]=event.srcElement.value;
   }
   deactivate():void {
     this.setActive(null);
+  }
+  setDisplayType(o, event){
+    if(event.srcElement.value=='checkbox'){
+      o.format='checkbox';
+      delete o.displayType;
+      if(!o.items)
+        o.items=(o.enum)?{enum:o.enum}:{enum:[]};
+      delete o.enum;
+    }else{
+      delete o.format;
+      o.displayType='select';
+      if(!o.enum)
+        o.enum=(o.items && o.items.enum)?o.items.enum:[];
+      delete o.items;
+    }
+    console.log(event.srcElement.value);
   }
   setTarget(o,event){
     if(event=="reference"){
@@ -204,21 +244,23 @@ export class JSONEditorComponent implements OnInit {
     }
     if(event=="selectlist"){
       o["enum"]=[];
+      o["displayType"]="select";
     }else{
       delete o["enum"];
+      delete o["items"];
     }
   }
   contains(array, o){
     return array.includes(o);
   }
-  setRequired(array, o, event){
+  setRequired(o, t, event){
     if(event.srcElement.checked){
-      if(!array.includes(o))
-        array.push(o);
+      if(!this.dict.definitions[t].required.includes(o))
+      this.dict.definitions[t].required.push(o);
     }else{
-      for(var i=0;i<array.length; i++){
-        if(array[i]==o)
-          array.splice(i,1);
+      for(var i=0;i<this.dict.definitions[t].required.length; i++){
+        if(this.dict.definitions[t].required[i]==o)
+          this.dict.definitions[t].required.splice(i,1);
       }
     }
   }
@@ -248,24 +290,43 @@ export class JSONEditorComponent implements OnInit {
         }
       }
       definition.properties=h;
+
+      if(definition.required && (definition.required.indexOf(fieldname)>=0))
+        definition.required.splice(definition.required.indexOf(fieldname),1);
+
     }
   }
   deleteObject(o){
     if(!confirm("Delete "+o.key+ " permanently?")) 
       return;
     let res={"properties":{},"definitions":{}};
-    for(let key in this.dict.schema.properties){
+    for(let key in this.dict.properties){
       if(key!=o.key){
-        res.properties[key]=this.dict.schema.properties[key];
-        res.definitions[key]=this.dict.schema.definitions[key];
+        res.properties[key]=this.dict.properties[key];
+        res.definitions[key]=this.dict.definitions[key];
       }
     }
-    this.set({"schema":res});
+    this.set(res);
   }
   setPluralTitle(t, event){
     t.plural_title=event.srcElement.value;
   }
-  setReferables(event){
-    this.referables=Object.keys(this.dict.schema.properties).filter(key => this.dict.schema.definitions[key].multiple).map(k => ({"key":k, "value":this.dict.schema.definitions[k]}));
+  setReferables(event: Event){
+    this.referables=Object.keys(this.dict.properties).filter(key => this.dict.definitions[key].multiple).map(k => ({"key":k, "value":this.dict.definitions[k]}));
+    for(let key in this.dict.properties){
+      if(!this.dict.definitions[key].multiple){
+        delete(this.dict.properties[key].items);
+        this.dict.properties[key]["$ref"]="#/definitions/"+key;
+        delete this.dict.properties[key].type;
+      }else{
+        delete(this.dict.properties[key]["$ref"]);
+        this.dict.properties[key].items={"$ref":"#/definitions/"+key};
+        this.dict.properties[key].type="array";
+      }
+    }
+    this.set(JSON.parse(JSON.stringify(this.dict)));
+  }
+  hasFormat(name: string){
+    return (name=="text");
   }
 }
