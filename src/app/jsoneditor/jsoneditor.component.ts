@@ -133,6 +133,7 @@ export class JSONEditorComponent implements OnInit {
             "type": "object",
             "title": "Insert title",
             "multiple": false,
+            "details": false,
             "required": ["_localId"],
             "properties": {
               "_localId": {"type": "string", "options": {"hidden": true}, "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"},

@@ -24,6 +24,7 @@
         <textarea *ngIf="isActive(dict.definitions[item.key],'description')" [(ngModel)]="dict.definitions[item.key].description"></textarea>
       </div>
       <div><label class="block">Multiple <input type="checkbox" [(ngModel)]="dict.definitions[item.key].multiple"  (focus)="setActive(null)" (change)="setReferables()"></label></div>
+      <div><label class="block">Details <input type="checkbox" [(ngModel)]="dict.definitions[item.key].details"  (focus)="setActive(null)"></label></div>
 
       <div class="props">
         <div *ngFor="let pair of dict.definitions[item.key].properties | sortedhash" class="properties">
