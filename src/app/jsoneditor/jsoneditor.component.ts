@@ -1,6 +1,7 @@
 import { Component, OnInit, Input, ElementRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import isEqual from 'lodash.isequal';
+import { ObjectUnsubscribedError } from 'rxjs';
 
 @Component({
   selector: 'app-jsoneditor',
@@ -25,6 +26,7 @@ export class JSONEditorComponent implements OnInit {
     {id:'integer', name:'integer'},
     {id:'selectlist', name:'selectlist'},
     {id:'reference', name:'reference'},
+    {id:'number', name: 'number'}
   ]
   formats=[
     {id: "text", name: "Single line text"},
@@ -216,18 +218,22 @@ export class JSONEditorComponent implements OnInit {
   setDisplayType(o, event){
     if(event.srcElement.value=='checkbox'){
       o.format='checkbox';
+      o.type="array";
       delete o.displayType;
       if(!o.items)
         o.items=(o.enum)?{enum:o.enum}:{enum:[]};
+      o.items["type"]="string";
+      o.uniqueItems=true;
       delete o.enum;
     }else{
       delete o.format;
       o.displayType='select';
+      o.type="string";
       if(!o.enum)
         o.enum=(o.items && o.items.enum)?o.items.enum:[];
       delete o.items;
+      delete o.uniqueItems;
     }
-    console.log(event.srcElement.value);
   }
   setTarget(o,event){
     if(event=="reference"){
@@ -244,11 +250,19 @@ export class JSONEditorComponent implements OnInit {
       delete o["enumSource"];
     }
     if(event=="selectlist"){
+      o["type"]="string";
       o["enum"]=[];
       o["displayType"]="select";
     }else{
       delete o["enum"];
       delete o["items"];
+    }
+    if(event=="number"){
+      o["type"]="number";
+    }else if(event=="integer"){
+      o["type"]="integer";
+    }else{
+      o["type"]="string";
     }
   }
   contains(array, o){
@@ -294,9 +308,43 @@ export class JSONEditorComponent implements OnInit {
 
       if(definition.required && (definition.required.indexOf(fieldname)>=0))
         definition.required.splice(definition.required.indexOf(fieldname),1);
-
     }
   }
+  moveFieldUp(definition, fieldname){
+    let h={};
+    let current_position=definition.properties[fieldname].propertyOrder-1
+    Object.entries(definition.properties).forEach(([key, value])=>{
+      if(key==fieldname){
+        value["propertyOrder"]--
+      }else{
+        if(value["propertyOrder"]==current_position){
+          value["propertyOrder"]++
+        }
+      }
+      h[key]=value
+    })
+    definition.properties=h;
+  }
+  moveFieldDown(definition, fieldname){
+    let h={};
+    let current_position=definition.properties[fieldname].propertyOrder+1
+    Object.entries(definition.properties).forEach(([key, value])=>{
+      if(key==fieldname){
+        value["propertyOrder"]++
+      }else{
+        if(value["propertyOrder"]==current_position){
+          value["propertyOrder"]--
+        }
+      }
+      h[key]=value
+    })
+    definition.properties=h;
+  }
+  isNotLast(i, fieldset){
+    return Object.values(fieldset).length-2>i
+  }
+
+
   deleteObject(o){
     if(!confirm("Delete "+o.key+ " permanently?")) 
       return;
@@ -329,5 +377,40 @@ export class JSONEditorComponent implements OnInit {
   }
   hasFormat(name: string){
     return (name=="text");
+  }
+  moveup(item){
+    let current_position=item.value.propertyOrder-1
+    let res={"properties":{},"definitions":{}};
+    for(let key in this.dict.properties){
+      if(key==item.key){
+        this.dict.properties[key].propertyOrder--
+      }else{
+        if(this.dict.properties[key].propertyOrder==current_position){
+          this.dict.properties[key].propertyOrder++
+        }
+      }
+      res.properties[key]=this.dict.properties[key]
+      res.definitions[key]=this.dict.definitions[key]
+    }
+    this.set(res);
+  }
+  movedown(item){
+    let current_position=item.value.propertyOrder+1
+    let res={"properties":{},"definitions":{}};
+    for(let key in this.dict.properties){
+      if(key==item.key){
+        this.dict.properties[key].propertyOrder++
+      }else{
+        if(this.dict.properties[key].propertyOrder==current_position){
+          this.dict.properties[key].propertyOrder--
+        }
+      }
+      res.properties[key]=this.dict.properties[key]
+      res.definitions[key]=this.dict.definitions[key]
+    }
+    this.set(res);
+  }
+  isLast(i){
+    return i<Object.values(this.dict.properties).length-1
   }
 }
